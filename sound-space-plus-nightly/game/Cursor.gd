@@ -8,12 +8,20 @@ enum {
 }
 
 var sh:Vector2 = Vector2(-0.5,-0.5)
-var edgec:float = 0
-var edger:float = -SSP.edge_drift
+var edgec:float = 0.13125
+var edger:float = -SSP.get("edge_drift")
 var face:Vector2
 
 var move_mode:int = C_MOUSE
 var can_switch_move_modes:bool = true
+
+func drift_cursor(rx,ry,cx,cy):
+	if SSP.enable_drift_cursor:
+		if cx != rx or cy != ry:
+			$Mesh2.visible = true
+			$Mesh2.transform.origin.x = rx - cx
+			$Mesh2.transform.origin.y = -(ry - cy)
+		else: $Mesh2.visible = false
 
 func move_cursor(mdel:Vector2):
 	var rx = rpos.x
@@ -35,11 +43,11 @@ func move_cursor(mdel:Vector2):
 	transform.origin.x = cx
 	transform.origin.y = -cy
 
+	drift_cursor(rx,ry,cx,cy)
+
 func move_cursor_abs(mdel:Vector2):
-	var rx = rpos.x
-	var ry = rpos.y
-	rx = mdel.x
-	ry = mdel.y
+	var rx = mdel.x
+	var ry = mdel.y
 	
 	rx = clamp(rx, (0 + sh.x + edger), (3 + sh.x - edger))
 	ry = clamp(ry, (0 + sh.y + edger), (3 + sh.y - edger))
@@ -54,13 +62,15 @@ func move_cursor_abs(mdel:Vector2):
 	
 	transform.origin.x = cx
 	transform.origin.y = -cy
-	
-	if SSP.enable_drift_cursor:
-		if cx != rx or cy != ry:
-			$Mesh2.visible = true
-			$Mesh2.transform.origin.x = rx - cx
-			$Mesh2.transform.origin.y = -(ry - cy)
-		else: $Mesh2.visible = false
+
+	drift_cursor(rx,ry,cx,cy)
+
+
+onready var absCamera = get_node("../../../AbsCamera")
+func get_absolute_position():
+	absCamera.fov = SSP.get("fov")
+	var pos = absCamera.project_position(get_viewport().get_mouse_position(),3.75) * SSP.absolute_scale
+	return Vector2(pos.x,-pos.y) + Vector2(1,1)
 
 func _input(event:InputEvent):
 	if !SSP.replaying and !SSP.vr:
@@ -79,14 +89,21 @@ func _input(event:InputEvent):
 				move_cursor_abs((relative + off) * -1)
 			else:
 				move_cursor_abs(relative + off)
-		elif !SSP.cam_unlock and move_mode == C_MOUSE:
+		elif !SSP.get("cam_unlock") and move_mode == C_MOUSE:
 			visible = true
 			if (event is InputEventMouseMotion):
+				#and if not spectating multiplayer then move mouse on input
 				face = event.relative
 				if SSP.invert_mouse:
-					move_cursor((event.relative * 0.018 * SSP.sensitivity) * -1)
+					if SSP.absolute_mode:
+						move_cursor_abs(get_absolute_position() * -1)
+					else:
+						move_cursor((event.relative * 0.018 * SSP.sensitivity / SSP.render_scale) * -1)
 				else:
-					move_cursor(event.relative * 0.018 * SSP.sensitivity)
+					if SSP.absolute_mode:
+						move_cursor_abs(get_absolute_position())
+					else:
+						move_cursor(event.relative * 0.018 * SSP.sensitivity / SSP.render_scale)
 			
 		if (event is InputEventScreenDrag):
 			$VisualPos.visible = true
@@ -114,10 +131,22 @@ func cache_trail(part:Spatial):
 func recolor(col:Color):
 	$Mesh.get("material/0").albedo_color = Color(col.r,col.g,col.b,col.a)
 
+var mt = 0
 func _process(delta):
-	
 	if Input.is_action_just_pressed("debug_enable_mouse"):
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		mt = mt + 1
+		if mt == 1:
+			Input.set_custom_mouse_cursor(null)
+			Input.set_mouse_mode(Input.MOUSE_MODE_CONFINED)
+			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		if mt == 2:
+			Input.set_custom_mouse_cursor(load("res://assets/ui/blank.png"))
+			Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN)
+			if SSP.absolute_mode:
+				Input.set_mouse_mode(Input.MOUSE_MODE_CONFINED)
+			else:
+				Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+			mt = 0
 	frame = Engine.get_frames_drawn()
 	if SSP.cursor_spin != 0 and !SSP.cursor_face_velocity:
 		$Mesh.rotate_z(deg2rad(-delta*SSP.cursor_spin))
@@ -134,8 +163,11 @@ func _process(delta):
 		var p
 		if SSP.replay.sv == 1 or SSP.replay.autoplayer: p = SSP.replay.get_cursor_position(get_parent().ms)
 		else: p = SSP.replay.get_cursor_position(get_parent().rms)
-		transform.origin.x = p.x
-		transform.origin.y = p.y
+		if SSP.replay.sv < 3:
+			transform.origin.x = p.x
+			transform.origin.y = p.y
+		else:
+			move_cursor_abs(Vector2(p.x,p.y))
 	
 	if SSP.show_cursor and SSP.cursor_trail and SSP.smart_trail and trail_started:
 		var start_p = global_transform.origin
@@ -173,11 +205,11 @@ func _ready():
 	if !SSP.show_cursor: visible = false
 	
 	if !SSP.replaying:
-		if SSP.lock_mouse:
+		if not SSP.absolute_mode:
 			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 		else:
 			Input.set_mouse_mode(Input.MOUSE_MODE_CONFINED)
-			Input.set_custom_mouse_cursor(load("res://content/ui/blank.png"))
+			Input.set_custom_mouse_cursor(load("res://assets/ui/blank.png"))
 	else:
 		Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN)
 	

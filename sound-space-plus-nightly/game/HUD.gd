@@ -218,6 +218,7 @@ func update_timer(ms:float,canSkip:bool=false):
 	
 	timebar.value = clamp(qms/lms,0,1)
 	if canSkip: timelabel.text = "PRESS SPACE TO SKIP"
+	elif canSkip and OS.has_feature("Android"): timelabel.text = "TAP TO SKIP"
 	else: timelabel.text = "%d:%02d / %d:%02d" % [m,rs,lm,lrs]
 	SSP.song_end_time_str = "%d:%02d" % [m,rs]
 	
@@ -321,19 +322,21 @@ func _process(delta:float):
 	if gtimer >= 2:
 		calculating = true
 	
-	var fstr = "cursor speed\n{current} m/sec\n\ntop speed\n{top} m/sec"
+	var fstr = "cursor speed\n{current} m/sec/{frames}fr\n\ntop speed\n{top} m/sec/{frames}fr\n\nrec interval\n{rec}"
 	$Stats/Label.text = fstr.format(
 		{
 			"current": stepify(s_curspd,0.1),
-			"top": stepify(s_tcurspd,0.1)
+			"frames": Engine.get_frames_per_second(),
+			"top": stepify(s_tcurspd,0.1),
+			"rec": round(Spawn.rec_interval)
 		}
 	)
 	
 	# warning
-	if not SSP.fov == 70 and SSP.mod_flashlight and calculating:
+	if SSP.get("fov") < 70 and SSP.mod_flashlight and calculating:
 		$ObnoxiousWarning.trigger = true
 		$ObnoxiousWarning.target = "STOP PLAYING MASKED WITH {fov} FOV PUSSY\njust use the damn default man".format({
-			"fov": SSP.fov
+			"fov": SSP.get("fov")
 		})
 	
 
@@ -492,12 +495,7 @@ func _ready():
 		ms += "py's nerf"
 	elif SSP.hitwindow_ms == 58 and SSP.note_hitbox_size == 1.140:
 		ms += "Vulnus Judgement"
-	elif SSP.hitwindow_ms == 82 and SSP.note_hitbox_size == 1.700:
-		ms += ""
 	elif SSP.hitwindow_ms != 55 or SSP.note_hitbox_size != 1.140:
 		ms += "HW: %.0f ms | HB: %.02f m" % [SSP.hitwindow_ms,SSP.note_hitbox_size]
 	
 	modtxt.text = ms
-
-
-

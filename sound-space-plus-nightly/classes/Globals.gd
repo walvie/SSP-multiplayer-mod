@@ -1,5 +1,7 @@
 extends Node
 
+onready var rootg = get_tree().root
+
 enum {
 	CAMERA_HALF_LOCK
 	CAMERA_FULL_LOCK
@@ -487,7 +489,7 @@ func p(path:String) -> String:
 	var base_path = "user://"
 	var dir:Directory = Directory.new()
 	if OS.has_feature("Android"):
-		base_path = OS.get_system_dir(OS.SYSTEM_DIR_DESKTOP,true).plus_file("Android/data/net.chedski.soundspaceplus/files") + "/"
+		base_path = OS.get_user_data_dir() + "/"
 	return path.replace("user://",base_path)
 
 var error_sound:AudioStream
@@ -637,7 +639,7 @@ func _process(delta):
 	
 	if Input.is_action_just_pressed("fps"):
 		if !fps_disp.is_inside_tree():
-			get_tree().root.add_child(fps_disp)
+			rootg.add_child(fps_disp)
 		fps_visible = !fps_visible
 		fps_disp.visible = fps_visible
 
@@ -660,20 +662,36 @@ func _ready():
 		ProjectSettings.load_resource_pack(OS.get_executable_path().get_base_dir().plus_file("ui.pck"))
 		ProjectSettings.load_resource_pack(OS.get_executable_path().get_base_dir().plus_file("3dm.pck"))
 		ProjectSettings.load_resource_pack(OS.get_executable_path().get_base_dir().plus_file("worlds.pck"))
-	get_tree().call_deferred("change_scene","res://onboarding/onboardingload.tscn")
+	
+	var thread = Thread.new()
+	SSP.is_init = true
+	thread.start(SSP,"do_init")
+	
+	var disable_intro = false
+	var file:File = File.new()
+	if file.file_exists(Globals.p("user://settings.json")):
+		var err = file.open(Globals.p("user://settings.json"),File.READ)
+		if err != OK:
+			print("file.open failed"); return -2
+		var decode = JSON.parse(file.get_as_text())
+		file.close()
+		if !decode.error:
+			disable_intro = decode.result.has("disable_intro") and decode.result.disable_intro
+	if !disable_intro: get_tree().call_deferred("change_scene","res://astroroomlibrary.tscn")
+	else: get_tree().call_deferred("change_scene","res://init.tscn")
 	
 	url_regex.compile(
 		"((https?)://)[\\w\\-.]{2,256}(:\\d{1,5})?(/[\\w@:%._\\-+~&=]+)+/?"
 	)
 	
 	confirm_prompt = load("res://confirm.tscn").instance()
-	get_tree().root.call_deferred("add_child",confirm_prompt)
+	rootg.call_deferred("add_child",confirm_prompt)
 	
 	file_sel = load("res://filesel.tscn").instance()
-	get_tree().root.call_deferred("add_child",file_sel)
+	rootg.call_deferred("add_child",file_sel)
 	
 	notify_gui = load("res://notification_gui.tscn").instance()
-	get_tree().root.call_deferred("add_child",notify_gui)
+	rootg.call_deferred("add_child",notify_gui)
 	
 	fps_disp.margin_left = 15
 	fps_disp.margin_top = 15
@@ -689,5 +707,5 @@ func _ready():
 			cmdline[arg.lstrip("--")] = ""
 	
 	if OS.has_feature("debug"):
-		get_tree().root.call_deferred("add_child",fps_disp)
+		rootg.call_deferred("add_child",fps_disp)
 		fps_visible = true

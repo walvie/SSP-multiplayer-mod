@@ -27,31 +27,31 @@ func _connect_to_server():
 	
 	
 func _player_connected(id):
-	Server.player_in_multiplayer = true
+	self.player_in_multiplayer = true
 	print("Player: " + str(id) + " Connected")
 	
 	
 func _player_disconnected(id):
-	Server.player_in_multiplayer = false
+	self.player_in_multiplayer = false
 	if (players[local_player_id] == player_data):
 		rpc_id(1, "remove_player", local_player_id)
 	print("Player: " + str(id) + " Disconnected")
 	
 	
 func _connected_ok():
-	Server.player_in_multiplayer = true
+	self.player_in_multiplayer = true
 	print("Successfully connected to server")
 	register_player()
 	rpc_id(1, "send_player_info", local_player_id, player_data)
 	
 	
 func _connected_fail():
-	Server.player_in_multiplayer = false
+	self.player_in_multiplayer = false
 	print("Failed to connect")
 	
 	
 func _server_disconnected():
-	Server.player_in_multiplayer = false
+	self.player_in_multiplayer = false
 	print("Server Disconnected")
 	
 	

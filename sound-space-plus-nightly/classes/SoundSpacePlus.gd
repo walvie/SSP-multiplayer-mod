@@ -1,5 +1,7 @@
 extends Node
 
+onready var rootg = get_tree().root
+
 # Signals
 signal mods_changed
 signal speed_mod_changed
@@ -118,7 +120,7 @@ var song_end_pause_count:int
 var song_end_accuracy_str:String
 var song_end_time_str:String
 var song_end_length:float
-
+var song_end_combo:int
 # Replay data
 var replay:Replay
 var replay_path:String = ""
@@ -137,7 +139,7 @@ var errornum:int = 0 # Used by settings file errors
 var errorstr:String = "" # Used by loading errors (ie. errors/songload and errors/menuload)
 var first_init_done = false # Don't reload mods as that can cause problems
 var loaded_world = null # Holds the bg world for transit between songload and song player
-var was_map_screen_centered:bool = false
+var was_map_screen_centered:bool = true
 var menu_target:String = ProjectSettings.get_setting("application/config/default_menu_target")
 var is_init:bool = true # Used to check if Onboarding is being used for game startup
 
@@ -182,8 +184,7 @@ var queue_end_pause_count:int
 var queue_end_accuracy_str:String
 var queue_end_time_str:String
 var queue_end_length:float
-
-
+var queue_end_combo:int
 
 
 # Loaded sounds
@@ -277,7 +278,7 @@ func start_vr():
 		InputMap.action_add_event("vr_click",ev)
 	
 	var vr_av:VRPlayer = load("res://vr/VRPlayer.tscn").instance()
-	get_tree().root.add_child(vr_av)
+	rootg.add_child(vr_av)
 	vr_av.name = "VRPlayer"
 	vr_player = vr_av
 	
@@ -298,6 +299,7 @@ func prepare_queue():
 	queue_end_position = 0
 	queue_end_pause_count = 0
 	queue_end_length = 0
+	queue_end_combo = 0
 	for s in song_queue:
 		queue_end_length += s.last_ms
 
@@ -311,6 +313,8 @@ func get_next():
 	queue_end_total_notes += song_end_total_notes
 	queue_end_position += clamp(song_end_position,0,selected_song.last_ms)
 	queue_end_pause_count += song_end_pause_count
+	
+	queue_end_combo += song_end_combo
 	
 	if song_end_type == Globals.END_GIVEUP or queue_pos == song_queue.size():
 		print("all done!")
@@ -425,7 +429,7 @@ func update_rpc_song(): # Discord RPC
 	activity.set_details(selected_song.name)
 
 	var assets = activity.get_assets()
-	assets.set_large_image("icon")
+	assets.set_large_image("icon-bg")
 
 	Discord.activity_manager.update_activity(activity)
 func get_stream_with_default(path:String,default:AudioStream) -> AudioStream:
@@ -450,23 +454,24 @@ func get_stream_with_default(path:String,default:AudioStream) -> AudioStream:
 
 
 # Modifiers - Normal
-sync var mod_extra_energy:bool = false setget set_mod_extra_energy # Easy Mode
-sync var mod_no_regen:bool = false setget set_mod_no_regen # Hard Mode
-sync var mod_speed_level:int = Globals.SPEED_NORMAL setget set_mod_speed_level
-sync var mod_nofail:bool = false setget set_mod_nofail
-sync var mod_mirror_x:bool = false setget set_mod_mirror_x
-sync var mod_mirror_y:bool = false setget set_mod_mirror_y
-sync var mod_nearsighted:bool = false setget set_mod_nearsighted
-sync var mod_ghost:bool = false setget set_mod_ghost
-sync var mod_sudden_death:bool = false setget set_mod_sudden_death
-sync var mod_chaos:bool = false setget set_mod_chaos
-sync var mod_earthquake:bool = false setget set_mod_earthquake
-sync var mod_flashlight:bool = false setget set_mod_flashlight
+var mod_extra_energy:bool = false setget set_mod_extra_energy # Easy Mode
+var mod_no_regen:bool = false setget set_mod_no_regen # Hard Mode
+var mod_speed_level:int = Globals.SPEED_NORMAL setget set_mod_speed_level
+var mod_nofail:bool = false setget set_mod_nofail
+var mod_mirror_x:bool = false setget set_mod_mirror_x
+var mod_mirror_y:bool = false setget set_mod_mirror_y
+var mod_nearsighted:bool = false setget set_mod_nearsighted
+var mod_ghost:bool = false setget set_mod_ghost
+var mod_sudden_death:bool = false setget set_mod_sudden_death
+var mod_chaos:bool = false setget set_mod_chaos
+var mod_earthquake:bool = false setget set_mod_earthquake
+var mod_flashlight:bool = false setget set_mod_flashlight
 # Modifiers - Custom values
-sync var start_offset:float = 0 setget _set_start_offset
+var start_offset:float = 0 setget _set_start_offset
 var note_hitbox_size:float = 1.140 setget _set_hitbox_size
 var hitwindow_ms:float = 55 setget _set_hitwindow
 var custom_speed:float = 1 setget _set_custom_speed
+var disable_pausing:bool = false
 # Modifiers - Special
 var health_model:int = Globals.HP_SOUNDSPACE setget _set_health_model
 var grade_system:int = Globals.GRADE_SSP setget _set_grade_system
@@ -540,11 +545,15 @@ func _set_grade_system(v:int):
 	grade_system = v; emit_signal("mods_changed")
 
 
-
-
 # Settings - Notes
-var approach_rate:float = 40
-var spawn_distance:float = 40
+var approach_rate:float = 40 setget ,get_approach_rate
+func get_approach_rate():
+	if replaying and replay.settings.has("approach_rate"): return replay.settings.get("approach_rate")
+	return approach_rate
+var spawn_distance:float = 40 setget ,get_spawn_distance
+func get_spawn_distance():
+	if replaying and replay.settings.has("spawn_distance"): return replay.settings.get("spawn_distance")
+	return spawn_distance
 var note_spawn_effect:bool = false
 var note_size:float = 1
 var note_spin_x:float = 0
@@ -553,7 +562,10 @@ var note_spin_z:float = 0
 # actually nah llol !!!!! (vector is not needed i can just do it in another script)
 # var note_spin_vector:Vector3 = Vector3(note_spin_x,note_spin_y,note_spin_z)
 var note_opacity:float = 1
-var fade_length:float = 0.5
+var fade_length:float = 0.5 setget ,get_fade_length
+func get_fade_length():
+	if replaying and replay.settings.has("fade_length"): return replay.settings.get("fade_length")
+	return fade_length
 
 var show_hit_effect:bool = true
 var hit_effect_at_cursor:bool = true
@@ -563,23 +575,43 @@ var show_miss_effect:bool = true
 # Settings - Camera/Controls
 var hlm_converted:bool = false
 var sensitivity:float = 0.5
-var parallax:float = 6.5 # THESE DEFAULTS SHOULD BE BASED ON 0.35 HLM BECAUSE THEY GET CONVERTED
-var ui_parallax:float = 1.63
-var grid_parallax:float = 0
-var fov:float = 70
+var parallax:float = 6.5 setget ,get_parallax
+func get_parallax():
+	if replaying and replay.settings.has("parallax"): return replay.settings.get("parallax")
+	return parallax
+var ui_parallax:float = 1.63 setget ,get_ui_parallax
+func get_ui_parallax():
+	if replaying and replay.settings.has("ui_parallax"): return replay.settings.get("ui_parallax")
+	return ui_parallax
+var grid_parallax:float = 0 setget ,get_grid_parallax
+func get_grid_parallax():
+	if replaying and replay.settings.has("grid_parallax"): return replay.settings.get("grid_parallax")
+	return grid_parallax
+var fov:float = 70  setget ,get_fov
+func get_fov():
+	if replaying and replay.settings.has("fov"): return replay.settings.get("fov")
+	return fov
 var hit_fov:bool = false
 var hit_fov_additive:bool = true
 var hit_fov_exponential:bool = false
 var hit_fov_amplifier:float = 2
 var hit_fov_decay:float = 20
 var camera_mode:int = Globals.CAMERA_HALF_LOCK
-var cam_unlock:bool = false
+var cam_unlock:bool = false setget ,get_cam_unlock
+func get_cam_unlock():
+	if replaying and replay.settings.has("cam_unlock"): return replay.settings.get("cam_unlock")
+	return cam_unlock
 var lock_mouse:bool = true
+var absolute_mode:bool = false
+var absolute_scale:float = 1
 var edge_drift:float = 0
+var disable_intro:bool = false
 
 # Settings - Replays
 var record_replays:bool = false
 var alt_cam:bool = false
+var record_limit:int = 0
+var record_mode:int = 1
 
 # Settings - Cursor
 var cursor_color_type:int = Globals.CURSOR_CUSTOM_COLOR
@@ -621,6 +653,7 @@ var visual_approach_follow:bool = false
 var half_ghost:bool = false # Experimental
 var billboard_score:bool = false
 var score_popup:bool = true
+var mirror_buttons:bool = false
 
 # Settings - HUD Colors
 var panel_bg:Color = Color("#9b000000") #9bcecece
@@ -691,6 +724,9 @@ func _set_music_volume(v:float):
 var show_warnings:bool = true
 var auto_maximize:bool = false
 
+# Settings - Graphics & Advanced
+var render_scale:float = 1
+
 # Settings - Experimental
 var ensure_hitsync:bool = false
 var hitsync_offset:float = 0 # don't save this yet; probably not even a necessary setting
@@ -699,6 +735,7 @@ var do_note_pushback:bool = true # true; notes go past grid on miss, false; note
 var show_stats:bool = false
 
 var arcw_mode:bool = false # heheheha
+var sex_mode:bool = false # demon mode
 
 
 
@@ -740,6 +777,7 @@ func do_pb_check_and_set() -> bool:
 	pb.total_notes = song_end_total_notes
 	pb.pauses = song_end_pause_count
 	pb.has_passed = song_end_type == Globals.END_PASS
+	pb.max_combo = song_end_combo
 	return selected_song.set_pb_if_better(generate_pb_str(true),pb)
 func get_best():
 	return selected_song.get_pb(generate_pb_str(true))
@@ -898,6 +936,16 @@ func load_pbs():
 				x = file.get_16() # READ 2
 		file.close()
 
+# dumb lacunella stuff
+func is_lacunella_enabled():
+	var found:bool = false
+	var cdat = File.new()
+	if cdat.file_exists("user://lacunella.dat"):
+		cdat.open("user://lacunella.dat",File.READ)
+		var ctxt = cdat.get_as_text()
+		if ctxt.to_upper() == "MEOW":
+			found = true
+	return found
 
 # Settings save/load helpers
 func scol(c:Color) -> String:
@@ -939,6 +987,8 @@ func load_saved_settings():
 			play_miss_snd = data.play_miss_snd
 		if data.has("auto_preview_song"): 
 			auto_preview_song = data.auto_preview_song
+		if data.has("render_scale"):
+			render_scale = data.render_scale
 		if data.has("vsync_enabled"): 
 			OS.vsync_enabled = data.vsync_enabled
 		if data.has("vsync_via_compositor"): 
@@ -988,6 +1038,8 @@ func load_saved_settings():
 				select_mesh(mesh)
 		if data.has("play_menu_music"): 
 			play_menu_music = data.play_menu_music
+		if data.has("disable_pausing"): 
+			disable_pausing = data.disable_pausing
 		if data.has("note_hitbox_size"): 
 			note_hitbox_size = data.note_hitbox_size
 		if data.has("spawn_distance"): 
@@ -1024,6 +1076,10 @@ func load_saved_settings():
 			show_hit_effect = data.show_hit_effect
 		if data.has("lock_mouse"): 
 			lock_mouse = data.lock_mouse
+		if data.has("absolute_mode"):
+			absolute_mode = data.absolute_mode
+		if data.has("absolute_scale"):
+			absolute_scale = data.absolute_scale
 		if data.has("cursor_trail"): 
 			cursor_trail = data.cursor_trail
 		if data.has("trail_mode_scale"):
@@ -1066,6 +1122,10 @@ func load_saved_settings():
 			record_replays = data.record_replays
 		if data.has("alt_cam"): 
 			alt_cam = data.alt_cam
+		if data.has("record_mode"):
+			record_mode = data.record_mode
+		if data.has("record_limit"):
+			record_limit = data.record_limit
 		if data.has("show_accuracy_bar"): 
 			show_accuracy_bar = data.show_accuracy_bar
 		if data.has("show_letter_grade"): 
@@ -1097,6 +1157,8 @@ func load_saved_settings():
 			score_popup = data.score_popup
 		if data.has("billboard_score"): 
 			billboard_score = data.billboard_score
+		if data.has("mirror_buttons"): 
+			mirror_buttons = data.mirror_buttons
 		if data.has("smart_trail"): 
 			smart_trail = data.smart_trail
 		if data.has("sfx_2d"): 
@@ -1120,6 +1182,8 @@ func load_saved_settings():
 		
 		if data.has("target_fps"):
 			Engine.target_fps = data.target_fps
+		if data.has("disable_intro"):
+			disable_intro = data.disable_intro
 		
 		
 		if data.has("master_volume"):
@@ -1258,6 +1322,7 @@ func load_saved_settings():
 				print("integ 6"); return 8
 		
 		if sv >= 18:
+			disable_pausing = bool(file.get_8())
 			note_hitbox_size = float(str(file.get_float())) # fix weirdness with 1.14
 		if sv >= 19:
 			spawn_distance = file.get_float()
@@ -1361,6 +1426,7 @@ func load_saved_settings():
 		if sv >= 43:
 			score_popup = bool(file.get_8())
 			billboard_score = bool(file.get_8())
+			if (OS.has_feature("Android")): mirror_buttons = bool(file.get_8())
 		if sv >= 44:
 			fov = float(file.get_32())
 			hit_fov = bool(file.get_8())
@@ -1401,11 +1467,13 @@ func save_settings():
 	if err == OK:
 		var data = {
 			hlm_converted = hlm_converted,
+			disable_pausing = disable_pausing,
 			approach_rate = approach_rate,
 			sensitivity = sensitivity,
 			play_hit_snd = play_hit_snd,
 			play_miss_snd = play_miss_snd,
 			auto_preview_song = auto_preview_song,
+			render_scale = render_scale,
 			vsync_enabled = OS.vsync_enabled,
 			vsync_via_compositor = OS.vsync_via_compositor,
 			window_fullscreen = OS.window_fullscreen,
@@ -1448,6 +1516,8 @@ func save_settings():
 			fade_length = fade_length,
 			show_hit_effect = show_hit_effect,
 			lock_mouse = lock_mouse,
+			absolute_mode = absolute_mode,
+			absolute_scale = absolute_scale,
 			cursor_trail = cursor_trail,
 			trail_detail = trail_detail,
 			trail_time = trail_time,
@@ -1465,6 +1535,8 @@ func save_settings():
 			show_warnings = show_warnings,
 			record_replays = record_replays,
 			alt_cam = alt_cam,
+			record_mode = record_mode,
+			record_limit = record_limit,
 			show_accuracy_bar = show_accuracy_bar,
 			show_letter_grade = show_letter_grade,
 			simple_hud = simple_hud,
@@ -1477,10 +1549,12 @@ func save_settings():
 			visual_approach_follow = visual_approach_follow,
 			score_popup = score_popup,
 			billboard_score = billboard_score,
+			mirror_buttons = mirror_buttons,
 			sfx_2d = sfx_2d,
 			cursor_color_type = cursor_color_type,
 			half_ghost = half_ghost,
 			target_fps = Engine.target_fps,
+			disable_intro = disable_intro,
 			
 			master_volume = ser_float(clamp(AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Master")),-80,1000000)),
 			music_volume = ser_float(clamp(AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Music")),-80,1000000)),
@@ -1619,137 +1693,137 @@ func register_worlds():
 	# idI:String,nameI:String,pathI:String,creatorI:String="Unknown"
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_space_tunnel", "Neon Corners",
-		"res://content/worlds/space_tunnel.tscn", "Chedski",
-		"res://content/worlds/covers/space_tunnel.png"
+		"res://assets/worlds/space_tunnel.tscn", "Chedski",
+		"res://assets/worlds/covers/space_tunnel.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_neon_tunnel", "Neon Rings",
-		"res://content/worlds/neon_tunnel.tscn", "Chedski",
-		"res://content/worlds/covers/neon_tunnel.png"
+		"res://assets/worlds/neon_tunnel.tscn", "Chedski",
+		"res://assets/worlds/covers/neon_tunnel.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_deep_space", "Deep Space",
-		"res://content/worlds/deep_space.tscn", "Chedski",
-		"res://content/worlds/covers/deep_space.png"
+		"res://assets/worlds/deep_space.tscn", "Chedski",
+		"res://assets/worlds/covers/deep_space.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_void", "VOID",
-		"res://content/worlds/void.tscn", "Chedski",
-		"res://content/worlds/covers/void.png"
+		"res://assets/worlds/void.tscn", "Chedski",
+		"res://assets/worlds/covers/void.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_rainbow_road", "Rainbow Road",
-		"res://content/worlds/rainbow_road.tscn", "Chedski",
-		"res://content/worlds/covers/rainbow_road.png"
+		"res://assets/worlds/rainbow_road.tscn", "Chedski",
+		"res://assets/worlds/covers/rainbow_road.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_rainbow_road_nb", "Rainbow Road (no bloom)",
-		"res://content/worlds/rainbow_road.tscn", "Chedski",
-		"res://content/worlds/covers/rainbow_road.png"
+		"res://assets/worlds/rainbow_road.tscn", "Chedski",
+		"res://assets/worlds/covers/rainbow_road.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_cubic", "Cubic",
-		"res://content/worlds/cubic.tscn", "Chedski",
-		"res://content/worlds/covers/cubic.png"
+		"res://assets/worlds/cubic.tscn", "Chedski",
+		"res://assets/worlds/covers/cubic.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_classic", "Beyond",
-		"res://content/worlds/classic.tscn", "Chedski",
-		"res://content/worlds/covers/classic.png"
+		"res://assets/worlds/classic.tscn", "Chedski",
+		"res://assets/worlds/covers/classic.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_reality_dismissed", "Reality Dismissed",
-		"res://content/worlds/reality_dismissed.tscn", "pyrule",
-		"res://content/worlds/covers/custom.png"
+		"res://assets/worlds/reality_dismissed.tscn", "pyrule",
+		"res://assets/worlds/covers/custom.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_reality_dismissed_dark", "Reality Dismissed (Dark)",
-		"res://content/worlds/reality_dismissed_dark.tscn", "pyrule",
-		"res://content/worlds/covers/custom.png"
+		"res://assets/worlds/reality_dismissed_dark.tscn", "pyrule",
+		"res://assets/worlds/covers/custom.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_baseplate", "Baseplate (Day)",
-		"res://content/worlds/baseplate.tscn", "pyrule",
-		"res://content/worlds/covers/baseplate.png"
+		"res://assets/worlds/baseplate.tscn", "pyrule",
+		"res://assets/worlds/covers/baseplate.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_baseplate_night", "Baseplate (Night)",
-		"res://content/worlds/baseplate_night.tscn", "pyrule",
-		"res://content/worlds/covers/baseplate.png"
+		"res://assets/worlds/baseplate_night.tscn", "pyrule",
+		"res://assets/worlds/covers/baseplate.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_event_horizon", "Event Horizon",
-		"res://content/worlds/event_horizon.tscn", "Chedski",
-		"res://content/worlds/covers/custom.png"
+		"res://assets/worlds/event_horizon.tscn", "Chedski",
+		"res://assets/worlds/covers/custom.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_vaporwave", "v a p o r w a v e",
-		"res://content/worlds/vaporwave.tscn", "balt",
-		"res://content/worlds/covers/vaporwave.png"
+		"res://assets/worlds/vaporwave.tscn", "balt",
+		"res://assets/worlds/covers/vaporwave.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_seifuku", "Seifuku (TW: Gore)",
-		"res://content/worlds/seifuku.tscn", "pyrule",
-		"res://content/worlds/seifuku/scum.png"
+		"res://assets/worlds/seifuku.tscn", "pyrule",
+		"res://assets/worlds/seifuku/scum.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_seifuku_blurred", "Seifuku Blurred",
-		"res://content/worlds/seifukub.tscn", "pyrule",
-		"res://content/worlds/seifuku/scumb.png"
+		"res://assets/worlds/seifukub.tscn", "pyrule",
+		"res://assets/worlds/seifuku/scumb.png"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_tri_tunnel", "Tri-Tunnel",
-		"res://content/worlds/tri_tunnel.tscn", "Lexus, pyrule",
-		"res://content/worlds/tri_tunnel/cover.png"
+		"res://assets/worlds/tri_tunnel.tscn", "Lexus, pyrule",
+		"res://assets/worlds/tri_tunnel/cover.png"
 	))
 #	registry_world.add_item(BackgroundWorld.new(
 #		"ssp_seethrough", "Seethrough",
-#		"res://content/worlds/seethrough.tscn", "pyrule",
-#		"res://content/worlds/covers/void.png"
+#		"res://assets/worlds/seethrough.tscn", "pyrule",
+#		"res://assets/worlds/covers/void.png"
 #	))
 	# doesn't work :(
 	# registry_world.add_item(BackgroundWorld.new(
 	# 	"ssp_security_room", "Security Room",
-	# 	"res://content/worlds/security_room.tscn", "balt",
-	# 	"res://content/worlds/covers/vaporwave.png"
+	# 	"res://assets/worlds/security_room.tscn", "balt",
+	# 	"res://assets/worlds/covers/vaporwave.png"
 	# ))
 	# ----------------------------------------------------
 	# Custom content
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_custombg", "Custom Background",
-		"res://content/worlds/custombg.tscn", "Someone",
+		"res://assets/worlds/custombg.tscn", "Someone",
 		"res://error.jpg"
 	))
 	registry_world.add_item(BackgroundWorld.new(
 		"ssp_custom", "Modworld (info in the discord)",
-		"res://content/worlds/custom.tscn", "Someone",
-		"res://content/worlds/covers/custom.png"
+		"res://assets/worlds/custom.tscn", "Someone",
+		"res://assets/worlds/covers/custom.png"
 	))
 
 func register_meshes():
 	registry_mesh.add_item(NoteMesh.new(
 		"ssp_rounded", "Rounded",
-		"res://content/blocks/rounded.obj", "Chedski"
+		"res://assets/blocks/rounded.obj", "Chedski"
 	))
 	registry_mesh.add_item(NoteMesh.new(
 		"ssp_square", "Square",
-		"res://content/blocks/default.obj", "Chedski"
+		"res://assets/blocks/default.obj", "Chedski"
 	))
 	registry_mesh.add_item(NoteMesh.new(
 		"ssp_circle", "Circle",
-		"res://content/blocks/circle.obj", "Chedski"
+		"res://assets/blocks/circle.obj", "Chedski"
 	))
 	registry_mesh.add_item(NoteMesh.new(
 		"ssp_block", "Block",
-		"res://content/blocks/cube.obj", "Chedski"
+		"res://assets/blocks/cube.obj", "Chedski"
 	))
 	registry_mesh.add_item(NoteMesh.new(
 		"ssp_plane", "Front of Block",
-		"res://content/blocks/plane.obj", "Chedski"
+		"res://assets/blocks/plane.obj", "Chedski"
 	))
 	registry_mesh.add_item(NoteMesh.new(
 		"ssp_realplane", "Plane",
-		"res://content/blocks/quad.tres", "Chedski"
+		"res://assets/blocks/quad.tres", "Chedski"
 	))
 	var dir = Directory.new()
 	if dir.open(user_mesh_dir) == OK:
@@ -1765,36 +1839,36 @@ func register_meshes():
 			mesh_name = dir.get_next()
 func register_effects():
 	registry_effect.add_item(NoteEffect.new(
-		"ssp_ripple", "Ripple* (no color)", "res://content/notefx/ripple.tscn", "Chedski"
+		"ssp_ripple", "Ripple* (no color)", "res://assets/notefx/ripple.tscn", "Chedski"
 	))
 	registry_effect.add_item(NoteEffect.new(
-		"ssp_ripple_n", "Ripple* (note color)", "res://content/notefx/ripple.tscn", "Chedski"
+		"ssp_ripple_n", "Ripple* (note color)", "res://assets/notefx/ripple.tscn", "Chedski"
 	))
 	registry_effect.add_item(NoteEffect.new(
-		"ssp_ripple_r", "Ripple* (rainbow)", "res://content/notefx/ripple.tscn", "Chedski"
-	))
-	
-	registry_effect.add_item(NoteEffect.new(
-		"ssp_shards", "Shards (note color)", "res://content/notefx/shards.tscn", "Chedski"
-	))
-	registry_effect.add_item(NoteEffect.new(
-		"ssp_shards_r", "Shards (rainbow)", "res://content/notefx/shards.tscn", "Chedski"
-	))
-	registry_effect.add_item(NoteEffect.new(
-		"ssp_shards_w", "Shards (no color)", "res://content/notefx/shards.tscn", "Chedski"
+		"ssp_ripple_r", "Ripple* (rainbow)", "res://assets/notefx/ripple.tscn", "Chedski"
 	))
 	
 	registry_effect.add_item(NoteEffect.new(
-		"ssp_miss", "Miss* (red)", "res://content/notefx/miss.tscn", "Chedski"
+		"ssp_shards", "Shards (note color)", "res://assets/notefx/shards.tscn", "Chedski"
 	))
 	registry_effect.add_item(NoteEffect.new(
-		"ssp_miss_n", "Miss* (note color)", "res://content/notefx/miss.tscn", "Chedski"
+		"ssp_shards_r", "Shards (rainbow)", "res://assets/notefx/shards.tscn", "Chedski"
 	))
 	registry_effect.add_item(NoteEffect.new(
-		"ssp_miss_r", "Miss* (rainbow)", "res://content/notefx/miss.tscn", "Chedski"
+		"ssp_shards_w", "Shards (no color)", "res://assets/notefx/shards.tscn", "Chedski"
+	))
+	
+	registry_effect.add_item(NoteEffect.new(
+		"ssp_miss", "Miss* (red)", "res://assets/notefx/miss.tscn", "Chedski"
 	))
 	registry_effect.add_item(NoteEffect.new(
-		"ssp_miss_w", "Miss* (no color)", "res://content/notefx/miss.tscn", "Chedski"
+		"ssp_miss_n", "Miss* (note color)", "res://assets/notefx/miss.tscn", "Chedski"
+	))
+	registry_effect.add_item(NoteEffect.new(
+		"ssp_miss_r", "Miss* (rainbow)", "res://assets/notefx/miss.tscn", "Chedski"
+	))
+	registry_effect.add_item(NoteEffect.new(
+		"ssp_miss_w", "Miss* (no color)", "res://assets/notefx/miss.tscn", "Chedski"
 	))
 
 
@@ -1929,6 +2003,30 @@ func do_init(_ud=null):
 			single_map_mode_txt = true
 			single_map_mode_path = Globals.cmdline.txt
 			single_map_mode_audio_path = Globals.cmdline.audio
+			
+	# Check for updates
+	if (OS.has_feature("Windows") or OS.has_feature("X11")) and !OS.has_feature("editor"):
+		emit_signal("init_stage_reached","Check for updates")
+		emit_signal("init_stage_num",-1)
+		yield(get_tree(),"idle_frame")
+		Online.check_latest_version()
+		var latest_version = yield(Online,"latest_version")
+		if ProjectSettings.get_setting("application/config/version") != latest_version:
+			var sel = 1
+			if !Online.latest_version_data.body.begins_with("-a"):
+				Globals.confirm_prompt.s_alert.play()
+				Globals.confirm_prompt.open("You are on an outdated version of the game! Would you like to automatically update?","Outdated",[{text="Ignore",wait=4},{text="Update",wait=2}])
+				sel = yield(Globals.confirm_prompt,"option_selected")
+				Globals.confirm_prompt.s_next.play()
+				Globals.confirm_prompt.close()
+				yield(Globals.confirm_prompt,"done_closing")
+			if bool(sel):
+				emit_signal("init_stage_reached","Updating the game")
+				Online.attempt_update()
+				yield(Online,"update_finished")
+				get_tree().call_deferred("quit",1)
+				OS.execute(OS.get_executable_path(),[],false)
+				return
 	
 	emit_signal("init_stage_reached","Init filesystem")
 	emit_signal("init_stage_num",-1)
@@ -2006,11 +2104,11 @@ func do_init(_ud=null):
 	emit_signal("init_stage_reached","Loading content 1/3\nBuilt-in & DLC")
 	yield(get_tree(),"idle_frame")
 	if first_init_done:
-		mapreg.append(["built-in","res://content/songs/built_in_maps.sspmr"])
+		mapreg.append(["built-in","res://assets/songs/built_in_maps.sspmr"])
 		if installed_dlc.has("ssp_testcontent"): mapreg.append(["test maps","res://test_assets/test_maps.sspmr"])
 	else:
 		print("loaded ssp_content DLC")
-		mapreg.append(["built-in","res://content/songs/built_in_maps.sspmr"])
+		mapreg.append(["built-in","res://assets/songs/built_in_maps.sspmr"])
 		installed_dlc.append("ssp_content")
 		if OS.has_feature("editor") or ProjectSettings.load_resource_pack("res://testcontent.pck"):
 			print("loaded ssp_testcontent DLC")
@@ -2075,7 +2173,7 @@ func do_init(_ud=null):
 		SSP.selected_song = song
 	else:
 		var smaps:Array = []
-		emit_signal("init_stage_reached","Register content 1/4\nImport SS+ maps\nLocating files")
+		emit_signal("init_stage_reached","Register content 1/4\nImport SSP maps\nLocating files")
 		yield(get_tree(),"idle_frame")
 		var sd:Array = []
 		dir.change_dir(user_map_dir)
@@ -2093,7 +2191,7 @@ func do_init(_ud=null):
 		emit_signal("init_stage_num",2)
 		
 		for i in range(smaps.size()):
-			emit_signal("init_stage_reached","Register content 1/4\nImport SS+ maps\n%.0f%%" % (
+			emit_signal("init_stage_reached","Register content 1/4\nImport SSP maps\n%.0f%%" % (
 				100*(float(i)/float(smaps.size()))
 			))
 			if (OS.get_ticks_msec() - lt) >= load_target_frame_time * 1000:
@@ -2166,24 +2264,24 @@ func do_init(_ud=null):
 	
 	emit_signal("init_stage_reached","Init default assets 2/6")
 	if lp: yield(get_tree(),"idle_frame")
-	def_miss_snd = load("res://content/sfx/miss.wav")
+	def_miss_snd = load("res://assets/sfx/miss.wav")
 	
 	emit_signal("init_stage_reached","Init default assets 3/6")
 	if lp: yield(get_tree(),"idle_frame")
-	def_hit_snd = load("res://content/sfx/hit.wav")
+	def_hit_snd = load("res://assets/sfx/hit.wav")
 	
 	emit_signal("init_stage_reached","Init default assets 4/6")
 	if lp: yield(get_tree(),"idle_frame")
-	def_fail_snd = load("res://content/sfx/fail.wav")
+	def_fail_snd = load("res://assets/sfx/fail.wav")
 	
 	emit_signal("init_stage_reached","Init default assets 5/6")
 	if lp: yield(get_tree(),"idle_frame")
-	def_pb_snd = load("res://content/sfx/new_best.wav")
+	def_pb_snd = load("res://assets/sfx/new_best.wav")
 	normal_pb_sound = def_pb_snd
 	
 	emit_signal("init_stage_reached","Init default assets 6/6")
 	if lp: yield(get_tree(),"idle_frame")
-	def_menu_bgm = load("res://content/sfx/music/menu_loop.ogg")
+	def_menu_bgm = load("res://assets/sfx/music/menu_loop.ogg")
 	
 	# Read settings
 	emit_signal("init_stage_reached","Read user settings")
@@ -2283,6 +2381,10 @@ func do_init(_ud=null):
 	if Input.is_key_pressed(KEY_A) and Input.is_key_pressed(KEY_R) and Input.is_key_pressed(KEY_C) and Input.is_key_pressed(KEY_W):
 		arcw_mode = true
 		alert = "ARCW mode enabled successfully."
+	if Input.is_key_pressed(KEY_S) and Input.is_key_pressed(KEY_E) and Input.is_key_pressed(KEY_X):
+		# we do a little trolling
+		sex_mode = true
+		alert = "Sex mode enabled successfully."
 	
 	var alert_snd_played:bool = false
 	if alert != "":
@@ -2294,16 +2396,19 @@ func do_init(_ud=null):
 		Globals.confirm_prompt.s_next.play()
 		Globals.confirm_prompt.close()
 		yield(Globals.confirm_prompt,"done_closing")
-	if should_ask_about_replays:
+	if should_ask_about_replays and not OS.has_feature("Android"):
 		emit_signal("init_stage_reached","Setup")
 		if !alert_snd_played: Globals.confirm_prompt.s_alert.play()
 		alert_snd_played = true
 		Globals.confirm_prompt.open("Would you like to record replays? This can be changed in settings later.","Replays",[{text="No"},{text="Yes"}])
 		var sel = yield(Globals.confirm_prompt,"option_selected")
 		record_replays = bool(sel)
+		Globals.confirm_prompt.open("Do you favor high quality or low file size replays? This can be changed in settings later.","Replays",[{text="File Size"},{text="Quality"}])
+		sel = yield(Globals.confirm_prompt,"option_selected")
+		record_limit = sel
 		save_settings()
 		Globals.confirm_prompt.s_next.play()
 		Globals.confirm_prompt.close()
 		yield(Globals.confirm_prompt,"done_closing")
+	is_init = false
 	emit_signal("init_stage_reached","Waiting for menu",true)
-

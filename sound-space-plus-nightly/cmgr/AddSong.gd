@@ -141,7 +141,7 @@ func reset_text_edit_screen():
 		get_node("../MenuSong").play()
 	$TxtFile/H/audio/player.stop()
 	
-	$TxtFile/H/E/Cover/T.texture = load("res://content/ui/placeholder_dark.jpg")
+	$TxtFile/H/E/Cover/T.texture = load("res://assets/ui/placeholder_dark.jpg")
 	$TxtFile/H/E/Cover/C.disabled = true
 	$TxtFile/H/E/Cover/C.pressed = false
 	
@@ -161,9 +161,10 @@ func select_type(type:int):
 		Globals.file_sel.open_file(
 			self,
 			"file_selected",
-			PoolStringArray(["*.sspm ; Sound Space+ map"]),
+			PoolStringArray(["*.sspm ; Sound Space Plus map"]),
 			false,
-			"~/Downloads"
+			#"~/Downloads"
+			OS.get_system_dir(OS.SYSTEM_DIR_DOWNLOADS)
 		)
 	elif type == T_TXT:
 		reset_text_edit_screen()
@@ -184,7 +185,8 @@ func sel_filetype(type:int):
 				"file_selected",
 				PoolStringArray(["*.zip, *.rar, *.7z, *.gz, *.vmap ; archive files"]),
 				false,
-				"~/Downloads"
+				#"~/Downloads"
+				OS.get_system_dir(OS.SYSTEM_DIR_DOWNLOADS)
 			)
 		elif type == F_DIR:
 			print("opening vulnus folder")
@@ -193,7 +195,8 @@ func sel_filetype(type:int):
 			Globals.file_sel.open_folder(
 				self,
 				"folder_selected",
-				"~/Downloads"
+				#"~/Downloads"
+				OS.get_system_dir(OS.SYSTEM_DIR_DOWNLOADS)
 			)
 	elif maptype == T_TXT:
 		if type == FO_TXT:
@@ -203,7 +206,8 @@ func sel_filetype(type:int):
 				"file_selected",
 				PoolStringArray(["*.txt ; Text files"]),
 				false,
-				"~/Downloads"
+				#"~/Downloads"
+				OS.get_system_dir(OS.SYSTEM_DIR_DOWNLOADS)
 			)
 		elif type == FO_SONG:
 			opening = FO_SONG
@@ -212,7 +216,8 @@ func sel_filetype(type:int):
 				"file_selected",
 				PoolStringArray(["*.mp3, *.ogg ; Audio files"]),
 				false,
-				"~/Downloads"
+				#"~/Downloads"
+				OS.get_system_dir(OS.SYSTEM_DIR_DOWNLOADS)
 			)
 
 const valid_chars = "0123456789abcdefghijklmnopqrstuvwxyz_-"
@@ -269,7 +274,7 @@ func populate_edit_screen():
 		$Edit/Cover/C.disabled = false
 		$Edit/Cover/C.pressed = true
 	else:
-		$Edit/Cover/T.texture = load("res://content/ui/placeholder_dark.jpg")
+		$Edit/Cover/T.texture = load("res://assets/ui/placeholder_dark.jpg")
 		$Edit/Cover/C.disabled = true
 		$Edit/Cover/C.pressed = false
 	

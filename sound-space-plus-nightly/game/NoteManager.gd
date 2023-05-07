@@ -10,7 +10,7 @@ export(Material) var note_solid_mat
 export(Material) var note_transparent_mat
 export(Material) var asq_mat
 
-var approach_rate:float = SSP.approach_rate
+var approach_rate:float = SSP.get("approach_rate")
 var speed_multi:float = Globals.speed_multi[SSP.mod_speed_level]
 var ms:float = SSP.start_offset - (3000 * speed_multi) # make waiting time shorter on lower speeds
 var notes_loaded:bool = false
@@ -24,7 +24,7 @@ var noteQueue:Array = []
 var colors:Array = SSP.selected_colorset.colors
 var hitEffect:Spatial = load(SSP.selected_hit_effect.path).instance()
 var missEffect:Spatial = load(SSP.selected_miss_effect.path).instance()
-var scoreEffect:Spatial = load("res://content/notefx/score.tscn").instance()
+var scoreEffect:Spatial = load("res://assets/notefx/score.tscn").instance()
 var hit_id:String = SSP.selected_hit_effect.id
 var miss_id:String = SSP.selected_miss_effect.id
 var chaos_rng:RandomNumberGenerator = RandomNumberGenerator.new()
@@ -82,7 +82,7 @@ func note_reposition(i:int):
 	var current_dist:float = approachSpeed*current_offset_ms/1000
 	
 	if (
-		(current_dist <= SSP.spawn_distance and current_dist >= (grid_pushback * -1) and sign(approachSpeed) == 1) or
+		(current_dist <= SSP.get("spawn_distance") and current_dist >= (grid_pushback * -1) and sign(approachSpeed) == 1) or
 		(current_dist >= -50 and current_dist <= 0.1 and sign(approachSpeed) == -1) or
 		sign(approachSpeed) == 0
 	) and state == Globals.NSTATE_ACTIVE: # state 2 = miss # and current_dist >= -0.5
@@ -108,10 +108,10 @@ func note_reposition(i:int):
 			nt.origin.y = real_position.y + (rcoord.y * (current_dist * 0.1))
 		
 #		if SSP.note_visual_approach:
-#			$Approach.opacity = 1 - (current_dist / SSP.spawn_distance)
+#			$Approach.opacity = 1 - (current_dist / SSP.get("spawn_distance"))
 #
-#			$Approach.scale.x = 0.4 * ((current_dist / SSP.spawn_distance) + 0.6)
-#			$Approach.scale.y = 0.4 * ((current_dist / SSP.spawn_distance) + 0.6)
+#			$Approach.scale.x = 0.4 * ((current_dist / SSP.get("spawn_distance")) + 0.6)
+#			$Approach.scale.y = 0.4 * ((current_dist / SSP.get("spawn_distance")) + 0.6)
 #
 #			$Approach.global_translation.z = 0
 			
@@ -120,7 +120,7 @@ func note_reposition(i:int):
 		nt.basis = nt.basis.rotated(Vector3(0,1,0),SSP.note_spin_y / 2000)
 		nt.basis = nt.basis.rotated(Vector3(0,0,1),SSP.note_spin_z / 2000)
 		
-		var alpha:float = 1
+		var alpha:float = SSP.note_opacity
 		var fade_in:float = 1
 		var fade_out:float = 1
 		
@@ -137,7 +137,7 @@ func note_reposition(i:int):
 		$Notes.multimesh.set_instance_transform(i - current_note, nt)
 		$Notes.multimesh.set_instance_color(i - current_note, Color(col.r, col.g, col.b, col.a * alpha))
 		if asq:
-			var sc = (linstep(0,SSP.spawn_distance,current_dist) + 0.6) * 0.4
+			var sc = (linstep(0,SSP.get("spawn_distance"),current_dist) + 0.6) * 0.4
 			
 			var at = Transform()
 			at = at.scaled(Vector3(sc,sc,sc))
@@ -146,7 +146,7 @@ func note_reposition(i:int):
 				at.origin.z = 0
 			
 			$ASq.multimesh.set_instance_transform(i - current_note, at)
-			$ASq.multimesh.set_instance_color(i - current_note, Color(1,1,1,pow(linstep(SSP.spawn_distance,0,current_dist),1.7)))
+			$ASq.multimesh.set_instance_color(i - current_note, Color(1,1,1,pow(linstep(SSP.get("spawn_distance"),0,current_dist),1.7)))
 		
 #		$Label.text += "(%.02f: %s -> %s = %s) %s\n" % [current_dist,fade_in_start,fade_in_end,fade_in,alpha]
 		
@@ -211,7 +211,7 @@ func reposition_notes(force:bool=false,rerun_start:int=-1):
 	
 	for i in range(max(current_note,rerun_start), notes.size()):
 		var notems:float = notes[i][1]
-		
+		next_ms = notems
 		if force:
 #			if is_first: $Label.text += "force\n"
 			note_reposition(i)
@@ -234,7 +234,7 @@ func reposition_notes(force:bool=false,rerun_start:int=-1):
 		if ms < notems and is_first:
 			is_first = false
 #			$Label.text += "next_ms: %s\n" % [ notems ]
-			next_ms = notems
+#			next_ms = notems
 		elif ms >= notems and notes[i][2] == Globals.NSTATE_ACTIVE:
 			var result = SSP.visual_mode or note_check_collision(i)
 
@@ -394,24 +394,24 @@ func _ready():
 	
 	if SSP.mod_ghost:
 		fade_out_enabled = true
-		fade_out_start = ((18.0/50)*SSP.approach_rate)
-		fade_out_end = ((6.0/50.0)*SSP.approach_rate)
+		fade_out_start = ((18.0/50)*approach_rate)
+		fade_out_end = ((6.0/50.0)*approach_rate)
 		
 	elif SSP.half_ghost:
 		fade_out_enabled = true
-		fade_out_start = ((12.0/50)*SSP.approach_rate)
-		fade_out_end = ((3.0/50.0)*SSP.approach_rate)
+		fade_out_start = ((12.0/50)*approach_rate)
+		fade_out_end = ((3.0/50.0)*approach_rate)
 		fade_out_base = 0.8
 	
 	if SSP.mod_nearsighted:
 		fade_in_enabled = true
-		fade_in_start = ((30.0/50.0)*SSP.approach_rate)
-		fade_in_end = ((5.0/50.0)*SSP.approach_rate)
+		fade_in_start = ((30.0/50.0)*approach_rate)
+		fade_in_end = ((5.0/50.0)*approach_rate)
 	else:
-		fade_in_enabled = SSP.fade_length != 0
-		if SSP.fade_length != 0: 
-			fade_in_start = SSP.spawn_distance
-			fade_in_end = SSP.spawn_distance*(1.0 - SSP.fade_length)
+		fade_in_enabled = SSP.get("fade_length") != 0
+		if SSP.get("fade_length") != 0: 
+			fade_in_start = SSP.get("spawn_distance")
+			fade_in_end = SSP.get("spawn_distance")*(1.0 - SSP.get("fade_length"))
 	
 	
 	$Notes.multimesh = MultiMesh.new()
@@ -436,7 +436,7 @@ func _ready():
 		if m != null:
 			mesh = m
 		else:
-			mesh = load("res://content/blocks/rounded.obj")
+			mesh = load("res://assets/blocks/rounded.obj")
 	else:
 		mesh = load(SSP.selected_mesh.path)
 	
@@ -493,7 +493,7 @@ func _ready():
 var music_started:bool = false
 const cursor_offset = Vector3(1,-1,0)
 onready var cam:Camera = get_node("../..").get_node("Camera")
-var hlpower = (0.1 * SSP.parallax)
+var hlpower = (0.1 * SSP.get("parallax"))
 onready var Grid = get_node("../HUD")
 
 func do_half_lock():
@@ -502,8 +502,8 @@ func do_half_lock():
 		cursorpos += $Cursor/Mesh2.transform.origin
 	var centeroff = cursorpos - cursor_offset
 	var hlm = 0.25
-	var uim = SSP.ui_parallax * 0.1
-	var grm = SSP.grid_parallax * 0.1
+	var uim = SSP.get("ui_parallax") * 0.1
+	var grm = SSP.get("grid_parallax") * 0.1
 	cam.transform.origin = Vector3(
 		centeroff.x*hlpower*hlm, centeroff.y*hlpower*hlm, 3.75
 	)
@@ -527,18 +527,14 @@ func do_spin():
 	centeroff.y = -cy - cursor_offset.y
 	
 	var hlm = 0.25
-	var uim = SSP.ui_parallax * 0.1
-	var grm = SSP.grid_parallax * 0.1
-	cam.transform.origin = Vector3(
-		centeroff.x*hlpower*hlm, centeroff.y*hlpower*hlm, 3.5
-	) + cam.transform.basis.z / 4
+	var uim = SSP.get("ui_parallax") * 0.1
+	var grm = SSP.get("grid_parallax") * 0.1
 	Grid.transform.origin = Vector3(
 		-centeroff.x*hlm*uim, -centeroff.y*hlm*uim, Grid.transform.origin.z
 	)
 	transform.origin = Vector3(
 		-(centeroff.x*hlm*grm)-1, -(centeroff.y*hlm*grm)+1, 0
 	)
-	get_node("Cursor").transform.origin = centeroff + cursor_offset
 
 func do_vr_cursor():
 	var centeroff = SSP.vr_player.primary_ray.get_collision_point() + cursor_offset
@@ -551,8 +547,8 @@ func do_vr_cursor():
 	centeroff.y = -cy - cursor_offset.y
 	
 	var hlm = 0.25
-	var uim = SSP.ui_parallax * 0.1
-	var grm = SSP.grid_parallax * 0.1
+	var uim = SSP.get("ui_parallax") * 0.1
+	var grm = SSP.get("grid_parallax") * 0.1
 	cam.transform.origin = Vector3(
 		centeroff.x*hlpower, centeroff.y*hlpower, 3.735
 	)
@@ -576,7 +572,7 @@ func comma_sep(number):
 	
 	return res
 
-var spawn_ms_dist:float = ((max(SSP.spawn_distance / SSP.approach_rate,0.6) * 1000) + 500)
+var spawn_ms_dist:float = ((max(SSP.get("spawn_distance") / SSP.get("approach_rate"),0.6) * 1000) + 500)
 
 func do_note_queue():
 	pass
@@ -593,7 +589,7 @@ func do_note_queue():
 
 var rec_t:float = 0
 var rms:float = 0
-var rec_interval:float = 35
+var rec_interval:float = 12
 var pause_state:float = 0
 var pause_cooldown:float = 0
 var pause_ms:float = 0
@@ -604,18 +600,49 @@ var ms_offset:float = 0
 var replay_sig:Array = []
 var last_usec = OS.get_ticks_usec()
 
+func _set_rec_interval(delta:float):
+	var newpos = $Cursor.transform.origin
+	var diff = last_cursor_position.distance_to(newpos)/delta
+	
+	var min_interval = 30
+	var max_interval = 144
+	match SSP.record_limit:
+		1:
+			min_interval = 60
+			max_interval = 240
+	if Engine.target_fps != 0:
+		max_interval = min(max_interval,Engine.target_fps)
+		min_interval = min(min_interval,max_interval)
+	var target_interval = min_interval+((diff/12)*(max_interval-min_interval))
+	var new_interval = rec_interval
+	if rec_interval != target_interval:
+		match SSP.record_mode:
+			0:
+				new_interval = target_interval
+			1:
+				if target_interval > rec_interval: new_interval += (target_interval-rec_interval) * (delta / 0.2)
+				else: new_interval += (target_interval-rec_interval) * (delta / 2)
+			2:
+				if target_interval > rec_interval: new_interval += (target_interval-rec_interval) * (delta / 2)
+				else: new_interval = target_interval
+	rec_interval = clamp(new_interval,min_interval,max_interval)
+	
+	last_cursor_position = newpos
+
 func _process(delta:float):
 	var u = OS.get_ticks_usec()
 	delta = float(u - last_usec) / 1_000_000.0
 	last_usec = u
 	
 	if SSP.vr: do_vr_cursor()
-	elif SSP.cam_unlock: do_spin()
+	elif SSP.get("cam_unlock"): do_spin()
 	else: do_half_lock()
+	
+	_set_rec_interval(delta)
+	
 	if active and notes_loaded:
 		if !notes_loaded: return
-	
-		can_skip = ((next_ms-prev_ms) > 5000) and (next_ms >= max(ms+(3000*speed_multi),1100*speed_multi))
+		can_skip = ((next_ms-prev_ms) > 5000) and (next_ms >= max(ms+(3000*speed_multi),1100*speed_multi)) and ($Notes.multimesh.visible_instance_count <= 1)
 		
 		$Cursor.can_switch_move_modes = (ms < SSP.music_offset)
 		
@@ -633,14 +660,14 @@ func _process(delta:float):
 					var prev_ms = ms
 					if SSP.record_replays:
 						SSP.replay.store_sig(rms,Globals.RS_SKIP)
-					ms = next_ms - (1000*speed_multi)
+					ms = next_ms - 1000 - (1000*speed_multi)
 					emit_signal("ms_change",ms)
 					do_note_queue()
-					if (ms + SSP.music_offset) >= SSP.start_offset:
-						$Music.play((ms + SSP.music_offset)/1000)
-						music_started = true
+#					if (ms + SSP.music_offset) >= SSP.start_offset:
+#						$Music.play((ms + SSP.music_offset)/1000)
+#						music_started = true
 				else:
-					if pause_state == 0 and (ms > (1000 * speed_multi) and ms < get_parent().last_ms) and pause_cooldown == 0:
+					if pause_state == 0 and (ms > (1000 * speed_multi) and ms < get_parent().last_ms) and pause_cooldown == 0 and !SSP.disable_pausing:
 						print("PAUSED AT MS %.0f" % ms)
 						if SSP.record_replays:
 							SSP.replay.store_pause(rms)
@@ -695,11 +722,12 @@ func _process(delta:float):
 					replay_unpause = false
 				elif s[1] == Globals.RS_FINISH_UNPAUSE:
 					should_end_unpause = true
-			
+
 			if should_skip:
 				var prev_ms = ms
-				ms = next_ms - (1000*speed_multi)
-	#			rms += (prev_ms - ms)
+				if SSP.record_replays:
+					SSP.replay.store_sig(rms,Globals.RS_SKIP)
+				ms = next_ms - 1000 - (1000*speed_multi)
 				emit_signal("ms_change",ms)
 				do_note_queue()
 				if (ms + SSP.music_offset) >= SSP.start_offset:
@@ -742,7 +770,7 @@ func _process(delta:float):
 			if should_giveup: get_parent().end(Globals.END_GIVEUP)
 		
 		rms += delta * 1000
-		rec_t += delta * 1000
+		rec_t += delta
 		if pause_state == 0 or (pause_state > 0 and (Input.is_action_pressed("pause") or replay_unpause)):
 			ms += delta * 1000 * speed_multi
 			emit_signal("ms_change",ms)
@@ -770,12 +798,12 @@ func _process(delta:float):
 		var rn_res:bool = reposition_notes()
 		if !SSP.replaying and SSP.record_replays:
 			var should_write_pos:bool = rn_res
-			var ri = rec_interval
-			if pause_state == -1: ri *= 3
+			var ri = 1/round(max(32,rec_interval))
+			if pause_state == -1: ri /= 3
 			if rn_res or rec_t >= ri:
 				rec_t = 0
 				should_write_pos = true
-				SSP.replay.store_cursor_pos(rms,$Cursor.transform.origin.x,$Cursor.transform.origin.y)
+				SSP.replay.store_cursor_pos(rms,$Cursor.rpos.x,$Cursor.rpos.y)
 		
 		if SSP.rainbow_grid:
 			$Inner.get("material/0").albedo_color = Color.from_hsv(SSP.rainbow_t*0.1,0.65,1)

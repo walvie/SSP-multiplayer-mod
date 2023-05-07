@@ -8,14 +8,17 @@ func idle_status():
 	activity.set_state("Listening to music")
 
 	var assets = activity.get_assets()
-	assets.set_large_image("icon")
+	assets.set_large_image("icon-bg")
 	
 	Discord.activity_manager.update_activity(activity)
 
 func _ready():
 	get_tree().paused = false
+	get_tree().set_screen_stretch(SceneTree.STRETCH_MODE_VIEWPORT, SceneTree.STRETCH_ASPECT_EXPAND, OS.window_size * SSP.render_scale)
 	if SSP.arcw_mode:
 		get_tree().change_scene("res://w.tscn")
+	if SSP.sex_mode:
+		get_tree().change_scene("res://sex.tscn")
 	
 	# fix audio pitchshifts
 	if AudioServer.get_bus_effect_count(AudioServer.get_bus_index("Music")) > 0:
@@ -32,7 +35,7 @@ func _ready():
 		activity.set_state("Selecting a song")
 
 		var assets = activity.get_assets()
-		assets.set_large_image("icon")
+		assets.set_large_image("icon-bg")
 
 		Discord.activity_manager.update_activity(activity)
 		

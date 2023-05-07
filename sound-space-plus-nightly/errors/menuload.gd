@@ -3,7 +3,7 @@ extends ColorRect
 func _ready():
 	Engine.target_fps = 30 # Don't use the entire GPU for the error screen
 	$Info.text = """-- menu load error --
-ss+ version: v%s
+ssp version: v%s
 platform: %s
 error info: %s
 menu target: %s""" % [
@@ -21,7 +21,7 @@ menu target: %s""" % [
 		activity.set_state("(menu loading error)")
 
 		var assets = activity.get_assets()
-		assets.set_large_image("icon")
+		assets.set_large_image("icon-bg")
 		assets.set_small_image("error")
 
 		var result = yield(Discord.activity_manager.update_activity(activity), "result").result

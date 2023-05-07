@@ -24,7 +24,7 @@ func _player_disconnected(player_id):
 	print("Player: " + str(player_id) + " Disconnected")
 	
 	
-remote func remove_player(id):
+remote func remove_player(id, player_data):
 	print(players)
 	players.erase(id)
 	print(players)

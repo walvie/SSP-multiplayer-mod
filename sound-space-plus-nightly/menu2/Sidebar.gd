@@ -53,6 +53,18 @@ func press(bi:int,q:bool=false):
 	get_node("Click").visible = !open
 	get_node("../SidebarClick").visible = open
 
+func to_old_menu():
+	get_node("../Press").play()
+	get_viewport().get_node("Menu").black_fade_target = true
+	if Input.is_key_pressed(KEY_C):
+		if !SSP.selected_song:
+			Globals.notify(Globals.NOTIFY_WARN,"No selected song","Automatically selecting a song")
+			SSP.select_song(SSP.registry_song.items[0])
+		SSP.menu_target = "res://classes/cursordance/dancetest.tscn"
+	else: SSP.menu_target = "res://menu.tscn"
+	yield(get_tree().create_timer(0.35),"timeout")
+	get_tree().change_scene("res://menuload.tscn")
+
 func to_content_mgr():
 	get_node("../Press").play()
 	get_viewport().get_node("Menu").black_fade_target = true
@@ -85,13 +97,13 @@ func _ready():
 	if SSP.just_ended_song || SSP.single_map_mode: press(0,true)
 	else: press(1,true)
 	
-	$L/Server.connect("pressed",self,"on_multiplayer_pressed")
+	$L/Multiplayer.connect("pressed",self,"on_multiplayer_pressed")
 	$L/ContentMgr.connect("pressed",self,"to_content_mgr")
 	$L/StartVR.connect("pressed",self,"to_vr")
 	$L/Quit.connect("pressed",self,"quit")
 	
 	$L/ContentMgr.visible = not SSP.vr
-	$L/StartVR.visible = SSP.vr_available and not SSP.vr
+#	$L/StartVR.visible = SSP.vr_available and not SSP.vr
 	if SSP.vr or !OS.has_feature("pc"):
 		$L/Quit/Label.text = "Quit to Home"
 	

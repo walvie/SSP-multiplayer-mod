@@ -9,4 +9,3 @@ func upd(): pressed = SSP.mod_nofail
 func _ready():
 	upd()
 	SSP.connect("mods_changed",self,"upd")
-	

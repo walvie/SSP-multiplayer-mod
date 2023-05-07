@@ -2,7 +2,7 @@ extends ColorRect
 
 func _ready():
 	Engine.target_fps = 30 # Don't use the entire GPU for the error screen
-	$Info.text = """ss+ version: v%s
+	$Info.text = """ssp version: v%s
 %s""" % [
 		ProjectSettings.get_setting("application/config/version"),
 		SSP.errorstr,
@@ -16,7 +16,7 @@ func _ready():
 		activity.set_state("(command line argument error)")
 
 		var assets = activity.get_assets()
-		assets.set_large_image("icon")
+		assets.set_large_image("icon-bg")
 		assets.set_small_image("error")
 
 		var result = yield(Discord.activity_manager.update_activity(activity), "result").result

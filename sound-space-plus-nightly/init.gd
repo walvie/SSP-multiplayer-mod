@@ -1,6 +1,5 @@
 extends Node
 
-
 var thread:Thread = Thread.new()
 var target:String = SSP.menu_target
 var leaving:bool = false
@@ -20,6 +19,7 @@ var black_fade_target:bool = false
 var black_fade:float = 0
 
 func _ready():
+	
 #	init vr (disabled currently)
 #	var VR = ARVRServer.find_interface("OpenVR")
 #	if VR and VR.initialize():
@@ -44,8 +44,13 @@ func _ready():
 	yield(get_tree().create_timer(0.5),"timeout")
 	$AudioStreamPlayer.play()
 	
+	if not SSP.is_init:
+		stage("",true)
+		return
+	elif SSP.first_init_done:
+		thread.start(SSP,"do_init")
 	
-	thread.start(SSP,"do_init")
+	SSP.is_init = false
 	
 	if ProjectSettings.get_setting("application/config/discord_rpc"):
 		var activity = Discord.Activity.new()
@@ -57,12 +62,13 @@ func _ready():
 		else: activity.set_state("Starting the game")
 
 		var assets = activity.get_assets()
-		assets.set_large_image("icon")
+		assets.set_large_image("icon-bg")
 		
 		Discord.activity_manager.update_activity(activity)
 
 func _exit_tree():
-	thread.wait_to_finish()
+	if thread.is_active():
+		thread.wait_to_finish()
 
 var result
 

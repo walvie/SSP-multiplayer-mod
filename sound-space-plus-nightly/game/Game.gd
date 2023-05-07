@@ -8,6 +8,7 @@ var rawMapData:String
 var notes:Array
 var last_ms:float = 0
 onready var colors:Array = SSP.selected_colorset.colors
+onready var speed_multi = Globals.speed_multi[SSP.mod_speed_level]
 
 var score:int = 0
 var combo:int = 0
@@ -53,6 +54,7 @@ var total_notes:float = 0
 var energy:float = 6
 var max_energy:float = 6
 var energy_per_hit:float = 1
+var max_combo:int = 0
 
 func update_hud():
 	$HUD.update_static_values()
@@ -76,6 +78,9 @@ func end(end_type:int):
 	SSP.song_end_position = min($Spawn.ms,last_ms)
 	SSP.song_end_length = last_ms
 	SSP.song_end_type = end_type
+	SSP.song_end_combo = max_combo
+	print("song max combo: ", max_combo)
+	
 	if SSP.record_replays and !SSP.replaying:
 		SSP.replay.end_recording()
 	
@@ -110,10 +115,13 @@ func end(end_type:int):
 			ending = false
 			return
 	
-	black_fade_target = true
-	yield(get_tree().create_timer(0.35),"timeout")
-	
-	get_tree().change_scene("res://menuload.tscn")
+	if (!Server.player_in_multiplayer):
+		black_fade_target = true
+		yield(get_tree().create_timer(0.35),"timeout")
+		
+		get_tree().change_scene("res://menuload.tscn")
+	else:
+		print("start spectating, dont end map, player in multi lobby")
 
 func update_timer(ms:float,canSkip:bool=false):
 	var qms = ms + $Spawn.ms_offset
@@ -198,7 +206,6 @@ func linstep(a:float,b:float,x:float):
 	return clamp(abs((x - a) / (b - a)),0,1)
 
 func get_point_amt() -> int:
-	var speed_multi = Globals.speed_multi[SSP.mod_speed_level]
 	var spd = clamp(((speed_multi - 1) * 1.5) + 1, 0, 1.9)
 	
 	var hitbox_diff = SSP.note_hitbox_size - 1.140
@@ -218,6 +225,9 @@ func hit(col):
 	total_notes += 1
 	if !SSP.mod_no_regen: energy = clamp(energy+energy_per_hit,0,max_energy)
 	combo += 1
+
+	if combo > max_combo: max_combo = combo
+
 	var points = get_point_amt()
 	if combo_level != 8:
 		lvl_progress += 1
@@ -233,11 +243,9 @@ func hit(col):
 		elif SSP.hit_fov_exponential:
 			$"../Camera".fov *= SSP.hit_fov_amplifier
 		else:
-			$"../Camera".fov = SSP.fov - SSP.hit_fov_amplifier
+			$"../Camera".fov = SSP.get("fov") - SSP.hit_fov_amplifier
 	
 	score += points
-	Server.players[Server.local_player_id]["Current_score"] = score
-	Server.update_score()
 	return points
 
 func miss(col):

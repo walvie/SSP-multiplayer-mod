@@ -71,7 +71,6 @@ func finish():
 	
 	SSP.load_color_txt()
 	
-	
 	if Input.is_key_pressed(KEY_L):
 		SSP.replaying = true
 		SSP.replay = Replay.new()
@@ -139,7 +138,7 @@ func finish():
 				Globals.confirm_prompt.s_next.play()
 				yield(Globals.confirm_prompt,"done_closing")
 		
-		if SSP.approach_rate <= 0:
+		if SSP.get("approach_rate") <= 0:
 			Globals.confirm_prompt.open(
 				"You are using a non-standard approach rate. Some things might not work correctly.",
 				"Warning",
